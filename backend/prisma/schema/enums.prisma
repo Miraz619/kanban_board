@@ -1,0 +1,4 @@
+enum BoardMemberRole {
+  VIEWER
+  EDITOR
+}
