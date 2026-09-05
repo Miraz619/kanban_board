@@ -1,16 +1,29 @@
 import { Router } from 'express'
-import { Role } from '../../../generated/prisma/enums'
 import { auth } from '../../middleware/checkAuth'
+import { validateRequest } from '../../middleware/validateRequest'
 import { AuthController } from './auth.controller'
+import { AuthValidation } from './auth.validation'
 
 const router = Router()
 
-router.post('/register', AuthController.registerPatient)
-router.post('/login', AuthController.loginUser)
-router.get(
-    '/me',
-    auth(Role.ADMIN, Role.DOCTOR, Role.PATIENT, Role.SUPER_ADMIN),
-    AuthController.getMe,
+router.post(
+  '/register',
+  validateRequest(AuthValidation.registerUser),
+  AuthController.registerUser,
 )
+
+router.post(
+  '/login',
+  validateRequest(AuthValidation.loginUser),
+  AuthController.loginUser,
+)
+
+
+
 router.post('/refresh-token', AuthController.refreshToken)
+
+router.get('/me', auth(), AuthController.getMe)
+
+router.post('/logout', AuthController.logoutUser)
+
 export const AuthRoutes = router

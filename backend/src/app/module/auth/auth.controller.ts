@@ -1,105 +1,66 @@
-import { Request, Response } from 'express'
+import { CookieOptions, Request, Response } from 'express'
 import httpStatus from 'http-status'
+import config from '../../config'
+import { AppError } from '../../error/AppError'
 import { catchAsync } from '../../utils/catchAsync'
 import { sendResponse } from '../../utils/sendResponse'
-import { IRequestUser } from './auth.interface'
 import { AuthService } from './auth.service'
 
-const registerPatient = catchAsync(async (req: Request, res: Response) => {
-    const payload = req.body
-    const result = await AuthService.registerPatient(payload)
+const isProduction = config.node_env === 'production'
 
-    const { accessToken, refreshToken, user, patient } = result
+const authCookieOptions: CookieOptions = {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
+  path: '/',
+}
 
-    res.cookie("accessToken", accessToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "none",
-        maxAge: 1000 * 60 * 60 * 24 // 24 hour or 1 day
-    })
-    res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "none",
-        maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
-    })
+const registerUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.registerUser(req.body)
 
-    sendResponse(res, {
-        statusCode: httpStatus.CREATED,
-        success: true,
-        message: 'Patient registered successfully',
-        data: {
-            accessToken,
-            refreshToken,
-            user,
-            patient,
-        },
-    })
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.CREATED,
+    message: 'User registered successfully',
+    data: result,
+  })
 })
 
 const loginUser = catchAsync(async (req: Request, res: Response) => {
-    const payload = req.body
-    const result = await AuthService.loginUser(payload)
-    const { accessToken, refreshToken } = result
+  const result = await AuthService.loginUser(req.body)
+  const { accessToken, refreshToken } = result
+  res.cookie('accessToken', accessToken, {
+    ...authCookieOptions,
+    maxAge: 1000 * 60 * 60 * 24, // 1 day
+  })
+  res.cookie('refreshToken', refreshToken, {
+    ...authCookieOptions,
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+  })
 
-    res.cookie("accessToken", accessToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "none",
-        maxAge: 1000 * 60 * 60 * 24 // 24 hour or 1 day
-    })
-    res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "none",
-        maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
-    })
-
-    sendResponse(res, {
-        statusCode: httpStatus.OK,
-        success: true,
-        message: 'User logged in successfully',
-        data: {
-            accessToken,
-            refreshToken
-        },
-    })
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'User logged in successfully',
+    data: result,
+  })
 })
 
-const getMe = catchAsync(async (req: Request, res: Response) => {
-    const user = req.user as unknown as IRequestUser
 
-    if (!user) {
-        throw new Error('User information is missing in the request')
-    }
-
-    const result = await AuthService.getMe(user)
-    sendResponse(res, {
-        statusCode: httpStatus.OK,
-        success: true,
-        message: 'User profile fetched successfully',
-        data: result,
-    })
-})
-
-const refreshToken = catchAsync(async (req: Request, res: Response) => {
+const refreshToken =catchAsync(async (req: Request, res: Response) => {
     if (!req.cookies.refreshToken) {
         throw new Error('Refresh token is missing')
     }
-    const result = await AuthService.refreshToken(req.cookies.refreshToken)
-    const { accessToken, refreshToken: newRefreshToken } = result
+    const result = await AuthService.refreshAccessToken(req.cookies.refreshToken)
+    const { accessToken, refreshToken} = result
 
-    res.cookie("accessToken", accessToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "none",
-        maxAge: 1000 * 60 * 60 * 24 // 24 hour or 1 day
+    res.cookie('accessToken', accessToken, {
+        ...authCookieOptions,
+        maxAge: 1000 * 60 * 60 * 24, // 1 day
     })
-    res.cookie("refreshToken", newRefreshToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "none",
-        maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
+    res.cookie('refreshToken', refreshToken, {
+        ...authCookieOptions,
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     })
 
     sendResponse(res, {
@@ -108,15 +69,46 @@ const refreshToken = catchAsync(async (req: Request, res: Response) => {
         message: 'New tokens generated successfully',
         data: {
             accessToken,
-            refreshToken: newRefreshToken,
+            refreshToken,
         },
     })
 })
 
+const getMe = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      'User is not authenticated',
+    )
+  }
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'Current user retrieved successfully',
+    data: req.user,
+  })
+})
+
+const logoutUser = catchAsync(async (_req: Request, res: Response) => {
+  res.clearCookie('accessToken', authCookieOptions)
+  res.clearCookie('refreshToken', authCookieOptions)
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'Logged out successfully',
+    data: null,
+  })
+})
+
+
+
 
 export const AuthController = {
-    registerPatient,
-    loginUser,
-    getMe,
-    refreshToken,
+  registerUser,
+  loginUser,
+  refreshToken,
+  getMe,
+  logoutUser,
 }

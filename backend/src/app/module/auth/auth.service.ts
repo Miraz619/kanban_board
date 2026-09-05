@@ -1,192 +1,174 @@
+
 import bcrypt from 'bcryptjs'
-import { JwtPayload, SignOptions } from 'jsonwebtoken'
-import { Role, UserStatus } from '../../../generated/prisma/enums'
+import httpStatus from 'http-status'
 import config from '../../config'
+import { AppError } from '../../error/AppError'
 import { prisma } from '../../lib/prisma'
+import { ILoginUserPayload, IRegisterUserPayload } from './auth.interface'
+import { JwtPayload, SignOptions } from 'jsonwebtoken'
 import { jwtUtils } from '../../utils/jwt'
-import {
-    ILoginUserPayload,
-    IRegisterPatientPayload,
-    IRequestUser
-} from './auth.interface'
 
+const registerUser = async (payload: IRegisterUserPayload) => {
+  const name = payload.name.trim()
+  const email = payload.email.trim().toLowerCase()
 
-const registerPatient = async (payload: IRegisterPatientPayload) => {
-    const { name, password } = payload
-    const email = payload.email.trim().toLowerCase()
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  })
 
-    const isUserExists = await prisma.user.findUnique({
-        where: { email },
-    })
+  if (existingUser) {
+    throw new AppError(
+      httpStatus.CONFLICT,
+      'A user with this email already exists',
+    )
+  }
 
-    if (isUserExists) {
-        throw new Error('User with this email already exists')
-    }
+  const saltRounds = Number(config.bcrypt_salt_rounds) || 10
+  const hashedPassword = await bcrypt.hash(payload.password, saltRounds)
 
-    const hashedPassword = await bcrypt.hash(password, 8)
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      password: hashedPassword,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  })
 
-    const createdUser = await prisma.user.create({
-        data: {
-            name,
-            email,
-            password: hashedPassword,
-            role: Role.PATIENT,
-            status: UserStatus.ACTIVE,
-            emailVerified: false,
-            patient: {
-                create: { name, email },
-            },
-        },
-        omit: { password: true },
-        include: { patient: true },
-    })
-
-    const { patient, ...user } = createdUser
-    const jwtPayload = {
-        userId: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-    }
-
-    const accessToken = jwtUtils.createToken(
-        jwtPayload,
-        config.jwt_access_secret,
-        config.jwt_access_expires_in as SignOptions
-    );
-
-    const refreshToken = jwtUtils.createToken(
-        jwtPayload,
-        config.jwt_refresh_secret,
-        config.jwt_refresh_expires_in as SignOptions
-    );
-
-    return {
-        user,
-        patient,
-        accessToken,
-        refreshToken
-    }
+  return user
 }
 
 const loginUser = async (payload: ILoginUserPayload) => {
-    const { password } = payload
-    const email = payload.email.trim().toLowerCase()
 
-    const user = await prisma.user.findUnique({
-        where: { email },
-    })
+  const email = payload.email.trim().toLowerCase()
 
-    if (!user) {
-        throw new Error('User not found')
-    }
+  const user = await prisma.user.findUnique({
+    where: {
+      email,
+    },
+  })
 
-    if (user.status === UserStatus.BLOCKED) {
-        throw new Error('User is blocked')
-    }
+  if (!user) {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      'Invalid email or password',
+    )
+  }
 
-    if (user.isDeleted || user.status === UserStatus.DELETED) {
-        throw new Error('User is deleted')
-    }
+  const isPasswordMatched = await bcrypt.compare(
+    payload.password,
+    user.password,
+  )
 
-    const isPasswordMatched = await bcrypt.compare(password, user.password)
+  if (!isPasswordMatched) {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      'Invalid email or password',
+    )
+  }
 
-    if (!isPasswordMatched) {
-        throw new Error('Invalid credentials')
-    }
+  const accessToken = jwtUtils.createToken(
+    {
+      userId: user.id,
+      email: user.email,
+    },
+    config.jwt_access_secret,
+    config.jwt_access_expires_in as SignOptions['expiresIn'],
+  )
+ const refreshToken = jwtUtils.createToken({
+    userId: user.id,
+    email: user.email,
+  }, config.jwt_refresh_secret, config.jwt_refresh_expires_in as SignOptions['expiresIn'])
 
-    const jwtPayload = {
-        userId: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-    }
-
-    const accessToken = jwtUtils.createToken(
-        jwtPayload,
-        config.jwt_access_secret,
-        config.jwt_access_expires_in as SignOptions
-    );
-
-    const refreshToken = jwtUtils.createToken(
-        jwtPayload,
-        config.jwt_refresh_secret,
-        config.jwt_refresh_expires_in as SignOptions
-    );
-
-    return {
-        accessToken,
-        refreshToken
-    }
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    },
+ }
 }
 
-const getMe = async (user: IRequestUser) => {
-    const isUserExists = await prisma.user.findUnique({
-        where: {
-            id: user.userId,
-        },
-        include: {
-            patient: true,
-        },
-        omit: {
-            password: true,
-        },
-    })
 
-    if (!isUserExists) {
-        throw new Error('User not found')
-    }
 
-    return isUserExists
+const refreshAccessToken = async (currentRefreshToken: string) => {
+  const verificationResult = jwtUtils.verifyToken(
+    currentRefreshToken,
+    config.jwt_refresh_secret,
+  )
+
+  if (!verificationResult.success || !verificationResult.data) {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      'Invalid or expired refresh token',
+    )
+  }
+
+  const decodedToken = verificationResult.data as JwtPayload
+
+  if (
+    !decodedToken.userId ||
+    typeof decodedToken.userId !== 'string'
+  ) {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      'Invalid refresh token',
+    )
+  }
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: decodedToken.userId,
+    },
+    select: {
+      id: true,
+      email: true,
+    },
+  })
+
+  if (!user) {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      'User no longer exists',
+    )
+  }
+
+const tokenPayload = {
+  userId: user.id,
+  email: user.email,
 }
 
-const refreshToken = async (token: string) => {
-    const verifiedRefreshToken = jwtUtils.verifyToken(token, config.jwt_refresh_secret)
+const accessToken = jwtUtils.createToken(
+  tokenPayload,
+  config.jwt_access_secret,
+  config.jwt_access_expires_in as SignOptions['expiresIn'],
+)
 
-    if (!verifiedRefreshToken.success || !verifiedRefreshToken.data) {
-        throw new Error(config.node_env === 'development' ? verifiedRefreshToken.error : 'Invalid refresh token')
-    }
+const refreshToken = jwtUtils.createToken(
+  tokenPayload,
+  config.jwt_refresh_secret,
+  config.jwt_refresh_expires_in as SignOptions['expiresIn'],
+)
 
-    const data = verifiedRefreshToken.data as JwtPayload
 
-    const user = await prisma.user.findUnique({
-        where: { id: data.userId },
-    })
-
-    if (!user || user.isDeleted || user.status !== UserStatus.ACTIVE) {
-        throw new Error('User is inactive or not found')
-    }
-
-    const jwtPayload = {
-        userId: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-    }
-
-    const accessToken = jwtUtils.createToken(
-        jwtPayload,
-        config.jwt_access_secret,
-        config.jwt_access_expires_in as SignOptions
-    );
-
-    const refreshToken = jwtUtils.createToken(
-        jwtPayload,
-        config.jwt_refresh_secret,
-        config.jwt_refresh_expires_in as SignOptions
-    );
-
-    return {
-        accessToken,
-        refreshToken
-    }
+  return {
+    accessToken,
+    refreshToken,
+  }
 }
 
 
 
 export const AuthService = {
-    registerPatient,
-    loginUser,
-    getMe,
-    refreshToken
+  registerUser,
+  loginUser,
+  refreshAccessToken,
 }

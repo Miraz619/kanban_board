@@ -7,6 +7,8 @@ import { globalErrorHandler } from './app/middleware/globalErrorHandler'
 import { notFound } from './app/middleware/notFound'
 import { AuthRoutes } from './app/module/auth/auth.route'
 
+
+
 const app: Application = express()
 
 app.use(
@@ -26,14 +28,14 @@ app.use(cookieParser())
 app.use('/api/v1/auth', AuthRoutes)
 
 // Basic route
-app.get('/', async (req: Request, res: Response) => {
+app.get('/', async (_req: Request, res: Response) => {
     res.status(httpStatus.OK).json({
         success: true,
-        message: 'Welcome to PH Healthcare System Backend',
+        message: 'Welcome to the Mini Kanban Board API',
     })
 })
-
-app.use(globalErrorHandler)
 app.use(notFound)
+app.use(globalErrorHandler)
+
 
 export default app
