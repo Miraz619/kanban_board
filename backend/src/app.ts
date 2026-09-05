@@ -6,7 +6,7 @@ import config from './app/config'
 import { globalErrorHandler } from './app/middleware/globalErrorHandler'
 import { notFound } from './app/middleware/notFound'
 import { AuthRoutes } from './app/module/auth/auth.route'
-
+import { BoardRoutes } from './app/module/board/board.route'
 
 
 const app: Application = express()
@@ -34,6 +34,7 @@ app.get('/', async (_req: Request, res: Response) => {
         message: 'Welcome to the Mini Kanban Board API',
     })
 })
+app.use('/api/v1/boards', BoardRoutes)
 app.use(notFound)
 app.use(globalErrorHandler)
 
