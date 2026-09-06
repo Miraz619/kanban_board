@@ -33,11 +33,11 @@ FROM base AS runner
 ENV NODE_ENV=production
 
 COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
+COPY --from=builder /app/dist ./dist
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/server.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/server.js"]
