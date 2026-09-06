@@ -1,12 +1,13 @@
 
+import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import httpStatus from 'http-status'
-import config from '../../config'
-import { AppError } from '../../error/AppError'
-import { prisma } from '../../lib/prisma'
-import { ILoginUserPayload, IRegisterUserPayload } from './auth.interface'
+import config from '../../config/index.js'
+import { AppError } from '../../error/AppError.js'
+import { prisma } from '../../lib/prisma.js'
+import { ILoginUserPayload, IRegisterUserPayload } from './auth.interface.js'
 import { JwtPayload, SignOptions } from 'jsonwebtoken'
-import { jwtUtils } from '../../utils/jwt'
+import { jwtUtils } from '../../utils/jwt.js'
 
 const registerUser = async (payload: IRegisterUserPayload) => {
   const name = payload.name.trim()
@@ -84,6 +85,7 @@ const loginUser = async (payload: ILoginUserPayload) => {
  const refreshToken = jwtUtils.createToken({
     userId: user.id,
     email: user.email,
+    tokenId: randomUUID(),
   }, config.jwt_refresh_secret, config.jwt_refresh_expires_in as SignOptions['expiresIn'])
 
   return {
@@ -153,7 +155,7 @@ const accessToken = jwtUtils.createToken(
 )
 
 const refreshToken = jwtUtils.createToken(
-  tokenPayload,
+  { ...tokenPayload, tokenId: randomUUID() },
   config.jwt_refresh_secret,
   config.jwt_refresh_expires_in as SignOptions['expiresIn'],
 )

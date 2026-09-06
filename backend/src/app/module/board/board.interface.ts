@@ -1,5 +1,5 @@
 
-import type { BoardMemberRole } from '../../../generated/prisma/enums'
+import type { BoardMemberRole } from '../../../generated/prisma/enums.js'
 
 export interface ICreateBoardPayload {
   title: string

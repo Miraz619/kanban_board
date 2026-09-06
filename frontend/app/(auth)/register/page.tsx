@@ -1,0 +1,11 @@
+import type { Metadata } from "next"
+
+import { RegisterForm } from "@/modules/auth/components/register-form"
+
+export const metadata: Metadata = {
+  title: "Create account | Kanban Board",
+}
+
+export default function RegisterPage() {
+  return <RegisterForm />
+}

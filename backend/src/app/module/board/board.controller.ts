@@ -1,10 +1,10 @@
 
 import { Request, Response } from 'express'
 import httpStatus from 'http-status'
-import { AppError } from '../../error/AppError'
-import { catchAsync } from '../../utils/catchAsync'
-import { sendResponse } from '../../utils/sendResponse'
-import { BoardService } from './board.service'
+import { AppError } from '../../error/AppError.js'
+import { catchAsync } from '../../utils/catchAsync.js'
+import { sendResponse } from '../../utils/sendResponse.js'
+import { BoardService } from './board.service.js'
 
 const createBoard = catchAsync(async (req: Request, res: Response) => {
   const userId = getAuthenticatedUserId(req)

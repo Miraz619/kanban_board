@@ -1,13 +1,13 @@
 import httpStatus from 'http-status'
-import { BoardMemberRole } from '../../../generated/prisma/enums'
-import { AppError } from '../../error/AppError'
-import { prisma } from '../../lib/prisma'
+import { BoardMemberRole } from '../../../generated/prisma/enums.js'
+import { AppError } from '../../error/AppError.js'
+import { prisma } from '../../lib/prisma.js'
 import {
   ICreateBoardPayload,
   IShareBoardPayload,
   IUpdateBoardMemberPayload,
   IUpdateBoardPayload,
-} from './board.interface'
+} from './board.interface.js'
 
 const ensureBoardOwner = async (boardId: string, userId: string) => {
   const board = await prisma.board.findUnique({

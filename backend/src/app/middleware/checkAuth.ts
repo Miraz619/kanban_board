@@ -1,12 +1,12 @@
 import { NextFunction, Request, Response } from 'express'
 import { JwtPayload } from 'jsonwebtoken'
-import config from '../config'
+import config from '../config/index.js'
 
-import { prisma } from '../lib/prisma'
-import { IRequestUser } from '../module/auth/auth.interface'
-import { catchAsync } from '../utils/catchAsync'
-import { jwtUtils } from '../utils/jwt'
-import { AppError } from '../error/AppError'
+import { prisma } from '../lib/prisma.js'
+import { IRequestUser } from '../module/auth/auth.interface.js'
+import { catchAsync } from '../utils/catchAsync.js'
+import { jwtUtils } from '../utils/jwt.js'
+import { AppError } from '../error/AppError.js'
 
 declare global {
   namespace Express {

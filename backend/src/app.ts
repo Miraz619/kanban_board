@@ -2,11 +2,13 @@ import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import express, { Application, Request, Response } from 'express'
 import httpStatus from "http-status"
-import config from './app/config'
-import { globalErrorHandler } from './app/middleware/globalErrorHandler'
-import { notFound } from './app/middleware/notFound'
-import { AuthRoutes } from './app/module/auth/auth.route'
-import { BoardRoutes } from './app/module/board/board.route'
+import config from './app/config/index.js'
+import { globalErrorHandler } from './app/middleware/globalErrorHandler.js'
+import { notFound } from './app/middleware/notFound.js'
+import { AuthRoutes } from './app/module/auth/auth.route.js'
+import { BoardRoutes } from './app/module/board/board.route.js'
+import { ColumnRoutes } from './app/module/column/column.route.js'
+import { ColumnTaskRoutes, TaskRoutes } from './app/module/task/task.route.js'
 
 
 const app: Application = express()
@@ -25,7 +27,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use(express.json())
 app.use(cookieParser())
 
-app.use('/api/v1/auth', AuthRoutes)
+
 
 // Basic route
 app.get('/', async (_req: Request, res: Response) => {
@@ -34,7 +36,11 @@ app.get('/', async (_req: Request, res: Response) => {
         message: 'Welcome to the Mini Kanban Board API',
     })
 })
+app.use('/api/v1/auth', AuthRoutes)
+app.use('/api/v1/boards/:boardId/columns', ColumnRoutes)
 app.use('/api/v1/boards', BoardRoutes)
+app.use('/api/v1/columns/:columnId/tasks', ColumnTaskRoutes)
+app.use('/api/v1/tasks', TaskRoutes)
 app.use(notFound)
 app.use(globalErrorHandler)
 

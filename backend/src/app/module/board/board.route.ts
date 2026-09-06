@@ -1,9 +1,9 @@
 
 import { Router } from 'express'
-import { auth } from '../../middleware/checkAuth'
-import { validateRequest } from '../../middleware/validateRequest'
-import { BoardController } from './board.controller'
-import { BoardValidation } from './board.validation'
+import { auth } from '../../middleware/checkAuth.js'
+import { validateRequest } from '../../middleware/validateRequest.js'
+import { BoardController } from './board.controller.js'
+import { BoardValidation } from './board.validation.js'
 
 const router = Router()
 

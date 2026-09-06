@@ -1,10 +1,10 @@
 import { CookieOptions, Request, Response } from 'express'
 import httpStatus from 'http-status'
-import config from '../../config'
-import { AppError } from '../../error/AppError'
-import { catchAsync } from '../../utils/catchAsync'
-import { sendResponse } from '../../utils/sendResponse'
-import { AuthService } from './auth.service'
+import config from '../../config/index.js'
+import { AppError } from '../../error/AppError.js'
+import { catchAsync } from '../../utils/catchAsync.js'
+import { sendResponse } from '../../utils/sendResponse.js'
+import { AuthService } from './auth.service.js'
 
 const isProduction = config.node_env === 'production'
 
@@ -31,7 +31,7 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
   const { accessToken, refreshToken } = result
   res.cookie('accessToken', accessToken, {
     ...authCookieOptions,
-    maxAge: 1000 * 60 * 60 * 24, // 1 day
+    maxAge: 1000 * 60 * 15, // 15 minutes
   })
   res.cookie('refreshToken', refreshToken, {
     ...authCookieOptions,
@@ -42,21 +42,24 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: httpStatus.OK,
     message: 'User logged in successfully',
-    data: result,
+    data: { user: result.user },
   })
 })
 
 
-const refreshToken =catchAsync(async (req: Request, res: Response) => {
+const refreshToken = catchAsync(async (req: Request, res: Response) => {
     if (!req.cookies.refreshToken) {
-        throw new Error('Refresh token is missing')
+        throw new AppError(
+          httpStatus.UNAUTHORIZED,
+          'Refresh token is missing',
+        )
     }
     const result = await AuthService.refreshAccessToken(req.cookies.refreshToken)
     const { accessToken, refreshToken} = result
 
     res.cookie('accessToken', accessToken, {
         ...authCookieOptions,
-        maxAge: 1000 * 60 * 60 * 24, // 1 day
+        maxAge: 1000 * 60 * 15, // 15 minutes
     })
     res.cookie('refreshToken', refreshToken, {
         ...authCookieOptions,
@@ -67,10 +70,7 @@ const refreshToken =catchAsync(async (req: Request, res: Response) => {
         statusCode: httpStatus.OK,
         success: true,
         message: 'New tokens generated successfully',
-        data: {
-            accessToken,
-            refreshToken,
-        },
+        data: null,
     })
 })
 
